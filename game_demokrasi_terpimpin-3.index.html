@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Petualangan Demokrasi Terpimpin</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111;font-family:Arial,sans-serif;color:#fff;text-align:center}
+#wrap{max-width:1000px;margin:auto;padding:12px}
+h1{margin:8px 0;font-size:28px}
+#info{display:flex;justify-content:center;gap:20px;flex-wrap:wrap;margin:8px;font-weight:bold}
+canvas{width:100%;max-width:960px;background:#6ec6ff;border:5px solid #fff;image-rendering:pixelated}
+#quiz{display:none;background:#222;border:3px solid #fff;border-radius:12px;padding:18px;margin:12px auto;max-width:760px}
+button{margin:6px;padding:11px 18px;border:0;border-radius:8px;background:#f5c542;font-weight:bold;cursor:pointer}
+button:hover{transform:scale(1.03)}
+#message{min-height:25px;font-weight:bold}
+.small{font-size:14px;color:#ddd}
+</style>
+</head>
+<body>
+<div id="wrap">
+<h1>🍄 PETUALANGAN DEMOKRASI TERPIMPIN 🪙</h1>
+<div id="info">
+<span>Level: <b id="level">1</b></span>
+<span>⭐ Skor: <b id="score">0</b></span>
+<span>❤️ Nyawa: <b id="lives">3</b></span>
+</div>
+<canvas id="game" width="960" height="480"></canvas>
+<div id="message">Gunakan ← → untuk bergerak, SPACE untuk melompat. Kumpulkan koin lalu masuk ke bendera!</div>
+<div id="quiz"></div>
+<p class="small">Game edukasi sejarah • Fokus: Politik, Ekonomi, dan Konfrontasi Indonesia–Malaysia (Demokrasi Terpimpin)</p>
+</div>
+
+<script>
+const c=document.getElementById("game"),ctx=c.getContext("2d");
+let keys={},level=1,score=0,lives=3,playing=true,quizOpen=false;
+let player={x:60,y:380,w:28,h:34,vx:0,vy:0,on:false};
+let coins=[],blocks=[],flag={x:900,y:350,w:30,h:80};
+const levels=[
+ {title:"LEVEL 1 — KERAJAAN DEMOKRASI TERPIMPIN",info:"Dekrit Presiden 5 Juli 1959 menandai dimulainya Demokrasi Terpimpin.",q:"Siapa tokoh yang memiliki peran sangat besar dalam sistem Demokrasi Terpimpin?",a:["Mohammad Hatta","Soekarno","Sutan Sjahrir","Mohammad Natsir"],correct:1},
+ {title:"LEVEL 2 — DUNIA POLITIK",info:"Ciri politik: kekuasaan presiden menguat, MPRS/DPAS dibentuk, dan konsep Nasakom berkembang.",q:"Nasakom merupakan singkatan dari...",a:["Nasionalisme, Agama, Komunisme","Nasionalisme, Sosialisme, Komando","Nasionalisme, Aspirasi, Komando","Nasionalisme, Agama, Konstitusi"],correct:0},
+ {title:"LEVEL 3 — DUNIA EKONOMI",info:"Ekonomi menghadapi inflasi tinggi, kenaikan harga, dan kesulitan keuangan negara. Pemerintah mengeluarkan kebijakan seperti Dekon.",q:"Masalah ekonomi yang menonjol pada masa Demokrasi Terpimpin adalah...",a:["Inflasi tinggi","Deflasi tinggi","Surplus besar","Harga selalu turun"],correct:0},
+ {title:"LEVEL 4 — MUSUH MUNCUL",info:"Indonesia menentang pembentukan Federasi Malaysia karena dipandang sebagai proyek neo-kolonialisme Inggris.",q:"Mengapa Indonesia menentang pembentukan Federasi Malaysia?",a:["Karena Malaysia ingin memakai rupiah","Karena dianggap terkait neo-kolonialisme Inggris","Karena Malaysia keluar dari PBB","Karena Indonesia ingin bergabung dengan Malaysia"],correct:1},
+ {title:"LEVEL 5 — DWIKORA",info:"Pada 3 Mei 1964, Presiden Soekarno menyerukan Dwikora (Dwi Komando Rakyat).",q:"Apa kepanjangan dari Dwikora?",a:["Dua Komando Rakyat","Dwi Komando Rakyat","Dewan Komando Rakyat","Dua Kekuatan Rakyat"],correct:1},
+ {title:"LEVEL 6 — KONFRONTASI",info:"Konfrontasi Indonesia–Malaysia dilakukan melalui tekanan politik, diplomasi, dan tindakan militer/infiltrasi.",q:"Salah satu dampak Konfrontasi Indonesia–Malaysia adalah...",a:["Hubungan Indonesia dengan Malaysia dan Inggris memburuk","Inflasi langsung hilang","Indonesia bergabung dengan Malaysia","Konfrontasi memperbaiki hubungan kedua negara"],correct:0},
+ {title:"LEVEL 7 — BOSS BATTLE",info:"Boss: KONFRONTASI MALAYSIA. Kalahkan boss dengan memahami sebab, kebijakan, dan dampaknya.",q:"Urutan yang paling tepat adalah...",a:["Malaysia dibentuk → Indonesia mendukung → Dwikora","Rencana Federasi Malaysia → penolakan Indonesia → Dwikora/konfrontasi","Dwikora → Malaysia dibentuk → Indonesia mendukung","Dekon → Malaysia dibentuk → Dwikora"],correct:1}
+];
+
+function resetStage(){
+ player={x:60,y:380,w:28,h:34,vx:0,vy:0,on:false};
+ coins=[];
+ blocks=[];
+ for(let i=0;i<7;i++) coins.push({x:150+i*105,y:300-(i%2)*70,r:9,taken:false});
+ blocks=[
+  {x:120,y:420,w:160,h:60},{x:360,y:420,w:130,h:60},
+  {x:580,y:420,w:150,h:60},{x:800,y:420,w:160,h:60},
+  {x:260,y:350,w:80,h:25},{x:500,y:280,w:80,h:25},{x:720,y:330,w:80,h:25}
+ ];
+ flag={x:900,y:335,w:28,h:90};
+ document.getElementById("level").textContent=level;
+}
+function rectHit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
+function update(){
+ if(!playing||quizOpen)return;
+ player.vx=(keys.ArrowLeft?-3.8:0)+(keys.ArrowRight?3.8:0);
+ if((keys[" "]||keys.ArrowUp)&&player.on){player.vy=-10;player.on=false}
+ player.vy+=.45; player.x+=player.vx; player.y+=player.vy;
+ player.x=Math.max(0,Math.min(930,player.x));
+ player.on=false;
+ for(const b of blocks){
+  if(rectHit(player,b)&&player.vy>=0&&player.y+player.h-player.vy<=b.y){
+   player.y=b.y-player.h;player.vy=0;player.on=true;
+  }
+ }
+ if(player.y>500){lives--;document.getElementById("lives").textContent=lives;
+  if(lives<=0){alert("Game Over! Coba lagi dan pelajari materinya.");lives=3;score=0;level=1;document.getElementById("lives").textContent=lives;document.getElementById("score").textContent=score;resetStage();}
+  else{player.x=60;player.y=300;player.vy=0;}
+ }
+ for(const coin of coins) if(!coin.taken){
+  const dx=(player.x+14)-coin.x,dy=(player.y+17)-coin.y;
+  if(Math.hypot(dx,dy)<25){coin.taken=true;score+=10;document.getElementById("score").textContent=score;}
+ }
+ if(player.x+player.w>flag.x){openQuiz();}
+}
+function openQuiz(){
+ quizOpen=true; const d=levels[level-1],q=document.getElementById("quiz");
+ q.style.display="block";
+ q.innerHTML=`<h2>${d.title}</h2><p>${d.info}</p><h3>${d.q}</h3>`+
+ d.a.map((x,i)=>`<button onclick="answer(${i})">${String.fromCharCode(65+i)}. ${x}</button>`).join("")+
+ `<p id="feedback"></p>`;
+}
+function answer(i){
+ const d=levels[level-1],f=document.getElementById("feedback");
+ if(i===d.correct){
+  score+=100;document.getElementById("score").textContent=score;
+  f.textContent="✅ BENAR! Level berikutnya terbuka!";
+  setTimeout(()=>{document.getElementById("quiz").style.display="none";quizOpen=false;
+   if(level<levels.length){level++;resetStage();}else{victory();}
+  },900);
+ }else{
+  lives--;document.getElementById("lives").textContent=lives;
+  f.textContent="❌ Belum tepat. Coba lagi!";
+  if(lives<=0){setTimeout(()=>{alert("Nyawa habis. Mulai kembali dari Level 1.");location.reload()},500)}
+ }
+}
+function victory(){
+ playing=false;document.getElementById("quiz").innerHTML=
+ `<h2>🏆 VICTORY!</h2><p>Selamat! Kamu menaklukkan seluruh level.</p>
+ <p><b>Skor akhir: ${score}</b></p>
+ <p>Kamu sudah mempelajari perkembangan politik dan ekonomi masa Demokrasi Terpimpin serta Konfrontasi Indonesia–Malaysia.</p>
+ <button onclick="location.reload()">🔄 Main Lagi</button>`;
+}
+function draw(){
+ ctx.clearRect(0,0,960,480);
+ // sky
+ ctx.fillStyle="#6ec6ff";ctx.fillRect(0,0,960,480);
+ // clouds
+ ctx.fillStyle="#fff";[[100,70],[420,55],[740,90]].forEach(p=>{ctx.beginPath();ctx.arc(p[0],p[1],25,0,7);ctx.arc(p[0]+25,p[1]+5,20,0,7);ctx.arc(p[0]-25,p[1]+7,18,0,7);ctx.fill()});
+ // ground
+ ctx.fillStyle="#55a63a";ctx.fillRect(0,455,960,25);
+ ctx.fillStyle="#9b6b3e";ctx.fillRect(0,465,960,15);
+ // blocks
+ for(const b of blocks){ctx.fillStyle="#b96f35";ctx.fillRect(b.x,b.y,b.w,b.h);ctx.strokeStyle="#6b3d1e";ctx.strokeRect(b.x,b.y,b.w,b.h)}
+ // coins
+ for(const coin of coins)if(!coin.taken){ctx.fillStyle="#ffd43b";ctx.beginPath();ctx.arc(coin.x,coin.y,coin.r,0,7);ctx.fill();ctx.strokeStyle="#9c7610";ctx.stroke()}
+ // flag
+ ctx.fillStyle="#333";ctx.fillRect(flag.x,flag.y,5,120);ctx.fillStyle="#e83b3b";ctx.beginPath();ctx.moveTo(flag.x+5,flag.y);ctx.lineTo(flag.x+38,flag.y+13);ctx.lineTo(flag.x+5,flag.y+26);ctx.fill();
+ // player - original pixel hero
+ ctx.fillStyle="#243b80";ctx.fillRect(player.x+5,player.y+12,18,20);
+ ctx.fillStyle="#f1b58b";ctx.fillRect(player.x+7,player.y+4,16,12);
+ ctx.fillStyle="#333";ctx.fillRect(player.x+5,player.y,19,6);
+ ctx.fillStyle="#8b3d2e";ctx.fillRect(player.x,player.y+18,7,8);ctx.fillRect(player.x+21,player.y+18,7,8);
+ ctx.fillStyle="#222";ctx.fillRect(player.x+4,player.y+30,8,4);ctx.fillRect(player.x+18,player.y+30,8,4);
+ // title on canvas
+ ctx.fillStyle="#111";ctx.font="bold 20px Arial";ctx.fillText(levels[level-1].title,25,30);
+}
+function loop(){update();draw();requestAnimationFrame(loop)}
+addEventListener("keydown",e=>{keys[e.key]=true;if(["ArrowLeft","ArrowRight","ArrowUp"," "].includes(e.key))e.preventDefault()});
+addEventListener("keyup",e=>keys[e.key]=false);
+resetStage();loop();
+</script>
+</body>
+</html>
